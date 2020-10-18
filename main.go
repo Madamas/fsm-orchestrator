@@ -5,7 +5,7 @@ import (
 	"fsm/packages/fsm"
 )
 
-func blankFunc(_ fsm.ExecutionContext) (fsm.VerticeName, error) {return "", nil}
+func blankFunc(_ fsm.ExecutionContext) (fsm.VerticeName, error) { return "", nil }
 
 func main() {
 	sm := fsm.NewStepMap()

@@ -13,41 +13,74 @@ type VerticeTuple struct {
 
 type AdjacencyList map[VerticeName][]VerticeName
 
-func goDeep(start VerticeName, al AdjacencyList, visited *nodeSet) bool {
-	vertices, ok := al[start]
+type Color string
 
-	if !ok {
+var (
+	Grey  Color = "grey"
+	Black Color = "black"
+)
+
+type Colormap map[VerticeName]Color
+
+func goDeep(start VerticeName, al AdjacencyList, nodeColors *Colormap, visitStack *[]VerticeName) bool {
+	color := (*nodeColors)[start]
+	if color == Black {
 		return false
 	}
 
-	(*visited)[start] = true
+	vertices, ok := al[start]
+
+	if !ok {
+		(*nodeColors)[start] = Black
+		*visitStack = append(*visitStack, start)
+
+		return false
+	}
+
+	color = (*nodeColors)[start]
+	if color != Black {
+		(*nodeColors)[start] = Grey
+	}
 
 	for _, node := range vertices {
-		_, alreadyWasThere := (*visited)[node]
+		color, ok := (*nodeColors)[node]
 
-		if alreadyWasThere {
-			return true
+		if ok {
+			if color == Black {
+				*visitStack = append(*visitStack, start)
+			}
+
+			return color == Grey
 		}
 
-		hasCycle := goDeep(node, al, visited)
+		hasCycle := goDeep(node, al, nodeColors, visitStack)
 
 		if hasCycle {
 			return true
 		}
 	}
 
+	color = (*nodeColors)[start]
+	if color == Grey {
+		(*nodeColors)[start] = Black
+		*visitStack = append(*visitStack, start)
+	}
+
 	return false
 }
-// Kahn's algorithm
+
+// DFS algorithm
 func IsAcyclic(al AdjacencyList) bool {
-	ns := NewNodeSet()
+	cm := make(Colormap)
+	vs := []VerticeName{}
 
-	defer func(nodeset nodeSet) {
-		fmt.Printf("\nVisited nodes %v\n", nodeset)
-	}(ns)
+	defer func() {
+		fmt.Printf("\nVisited nodes %v\n", vs)
+		fmt.Printf("\nNode colors %v\n", cm)
+	}()
 
-	for node, _ := range al {
-		hasCycle := goDeep(node, al, &ns)
+	for node := range al {
+		hasCycle := goDeep(node, al, &cm, &vs)
 
 		if hasCycle {
 			return false
