@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"fsm/packages/fsm"
+	"github.com/Madamas/fsm-orchestrator/packages/fsm"
 )
 
 func blankFunc(_ fsm.ExecutionContext) (fsm.VerticeName, error) { return "", nil }
