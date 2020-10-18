@@ -1,7 +1,7 @@
 package fsm
 
 import (
-	"fmt"
+	"errors"
 )
 
 type VerticeName string
@@ -70,22 +70,38 @@ func goDeep(start VerticeName, al AdjacencyList, nodeColors *Colormap, visitStac
 }
 
 // DFS algorithm
-func IsAcyclic(al AdjacencyList) bool {
+func DfsSort(al AdjacencyList) (hasCycle bool, sortedNodes []VerticeName) {
 	cm := make(Colormap)
-	vs := []VerticeName{}
-
-	defer func() {
-		fmt.Printf("\nVisited nodes %v\n", vs)
-		fmt.Printf("\nNode colors %v\n", cm)
-	}()
 
 	for node := range al {
-		hasCycle := goDeep(node, al, &cm, &vs)
+		hasCycle = goDeep(node, al, &cm, &sortedNodes)
 
 		if hasCycle {
-			return false
+			return
 		}
 	}
 
-	return true
+	return
+}
+
+func PlotAdjacencyList(sm StepMap) (AdjacencyList, []VerticeName, error) {
+	al := make(AdjacencyList, len(sm))
+
+	for k, v := range sm {
+		_, ok := al[k]
+
+		if !ok {
+			al[k] = v.Children
+		} else {
+			al[k] = append(al[k], v.Children...)
+		}
+	}
+
+	hasCycles, sortedGraph := DfsSort(al)
+
+	if hasCycles {
+		return AdjacencyList{}, []VerticeName{}, errors.New("control graph can't hold cycles")
+	}
+
+	return al, sortedGraph, nil
 }

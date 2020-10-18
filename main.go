@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/Madamas/fsm-orchestrator/packages/fsm"
 )
 
@@ -13,7 +14,7 @@ func main() {
 	sm.AddStep("Second", []fsm.VerticeName{"Fourth", "Fifth"}, blankFunc)
 	sm.AddStep("Third", []fsm.VerticeName{"Sixth", "Seventh"}, blankFunc)
 
-	_, err := fsm.PlotAdjacencyList(sm)
+	_, _, err := fsm.PlotAdjacencyList(sm)
 
 	if err != nil {
 		fmt.Print(err.Error())
