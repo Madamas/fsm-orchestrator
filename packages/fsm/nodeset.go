@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-type nodeSet map[VerticeName]bool
+type nodeSet map[NodeName]bool
 
-func NewNodeSet(vn ...VerticeName) nodeSet {
+func NewNodeSet(vn ...NodeName) nodeSet {
 	ns := make(nodeSet, len(vn))
 
 	for _, v := range vn {
@@ -31,7 +31,13 @@ func (ns nodeSet) String() string {
 	return fmt.Sprintf("[%s]", keysJoined)
 }
 
-func (ns nodeSet) Set(node VerticeName) {
+func (ns nodeSet) SetMany(nodes ...NodeName) {
+	for _, node := range nodes {
+		ns.Set(node)
+	}
+}
+
+func (ns nodeSet) Set(node NodeName) {
 	_, ok := ns[node]
 
 	if ok {
@@ -41,8 +47,14 @@ func (ns nodeSet) Set(node VerticeName) {
 	ns[node] = true
 }
 
-func (ns nodeSet) Has(node VerticeName) bool {
+func (ns nodeSet) Has(node NodeName) bool {
 	_, ok := ns[node]
 
 	return ok
+}
+
+func (ns nodeSet) AppendNodeSet(nodeset nodeSet) {
+	for node := range nodeset {
+		ns.Set(node)
+	}
 }
