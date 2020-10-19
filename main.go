@@ -6,17 +6,21 @@ import (
 	"github.com/Madamas/fsm-orchestrator/packages/fsm"
 )
 
-func blankFunc(_ fsm.ExecutionContext) (fsm.VerticeName, error) { return "", nil }
+func blankFunc(_ fsm.ExecutionContext) (fsm.NodeName, error) { return "", nil }
 
 func main() {
 	sm := fsm.NewStepMap()
-	sm.AddStep("First", []fsm.VerticeName{"Second", "Third"}, blankFunc)
-	sm.AddStep("Second", []fsm.VerticeName{"Fourth", "Fifth"}, blankFunc)
-	sm.AddStep("Third", []fsm.VerticeName{"Sixth", "Seventh"}, blankFunc)
+	sm.AddStep("First", []fsm.NodeName{"Second", "Third"}, blankFunc)
+	sm.AddStep("Second", []fsm.NodeName{"Fourth", "Fifth"}, blankFunc)
+	sm.AddStep("Third", []fsm.NodeName{"Sixth", "Seventh"}, blankFunc)
+	sm.AddStep("Eight", []fsm.NodeName{"Sixth", "Seventh"}, blankFunc)
 
-	_, _, err := fsm.PlotAdjacencyList(sm)
+	root, err := fsm.CheckGraph(sm)
 
 	if err != nil {
 		fmt.Print(err.Error())
 	}
+
+	fmt.Println("AdjList", sm)
+	fmt.Println("Root", root)
 }
