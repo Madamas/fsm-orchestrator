@@ -15,8 +15,16 @@ type payload struct {
 }
 
 type HandleContext struct {
-	eventChannel chan<- string
-	storage      storage.Storage
+	executorChannel chan<- string
+	repository      storage.Repository
+}
+
+func mapObjectDto(payload payload) storage.ObjectDTO {
+	return storage.ObjectDTO{
+		Status:       storage.Initial,
+		CommandGraph: payload.GraphName,
+		Params:       payload.Params,
+	}
 }
 
 func (hc *HandleContext) ServeHTTP(r http.ResponseWriter, req *http.Request) {
@@ -37,7 +45,7 @@ func (hc *HandleContext) ServeHTTP(r http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	obj, err := hc.CreateJob(payload)
+	obj, err := hc.repository.CreateJob(mapObjectDto(payload))
 
 	if err != nil {
 		r.Write([]byte(err.Error()))
@@ -50,7 +58,7 @@ func (hc *HandleContext) ServeHTTP(r http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		r.Write([]byte(err.Error()))
 		r.WriteHeader(500)
-		hc.FailJob(obj.ID, err)
+		hc.repository.FailJob(obj.ID, err)
 		return
 	}
 
@@ -59,32 +67,12 @@ func (hc *HandleContext) ServeHTTP(r http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		r.Write([]byte(err.Error()))
 		r.WriteHeader(500)
-		hc.FailJob(obj.ID, err)
+		hc.repository.FailJob(obj.ID, err)
 		return
 	}
 
 	r.Write(resp)
 	r.WriteHeader(200)
-
-	return
-}
-
-func (hc *HandleContext) CreateJob(payload payload) (storage.Object, error) {
-	obj := storage.ObjectDTO{
-		Status:       storage.Initial,
-		CommandGraph: payload.GraphName,
-	}
-
-	return hc.storage.Create(obj)
-}
-
-func (hc *HandleContext) FailJob(id string, err error) {
-	data := storage.KV{
-		"status": storage.Failed,
-		"error": err.Error(),
-	}
-
-	hc.storage.UpdateById(id, data)
 
 	return
 }
@@ -97,15 +85,15 @@ func (hc *HandleContext) NotifyContext(id string) (err error) {
 		}
 	}()
 
-	hc.eventChannel <- id
+	hc.executorChannel <- id
 
 	return
 }
 
-func CreateHttpListener(executorChannel chan<-string, storage storage.Storage) http.Server {
+func CreateHttpListener(executorChannel chan<- string, repository storage.Repository) http.Server {
 	hc := HandleContext{
-		eventChannel: executorChannel,
-		storage: storage,
+		executorChannel: executorChannel,
+		repository:      repository,
 	}
 
 	return http.Server{
