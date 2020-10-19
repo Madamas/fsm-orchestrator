@@ -4,36 +4,36 @@ import (
 	"errors"
 )
 
-type VerticeName string
+type NodeName string
 
 type VerticeTuple struct {
-	From VerticeName
-	To   VerticeName
+	From NodeName
+	To   NodeName
 }
 
-type AdjacencyList map[VerticeName][]VerticeName
-
-type Color string
+type color string
 
 var (
-	Grey  Color = "grey"
-	Black Color = "black"
+	Grey  color = "grey"
+	Black color = "black"
 )
 
-type Colormap map[VerticeName]Color
+type colormap map[NodeName]color
 
-func goDeep(start VerticeName, al AdjacencyList, nodeColors *Colormap, visitStack *[]VerticeName) bool {
+func deepSearch(start NodeName, sm stepMap, nodeColors *colormap, children nodeSet, roots nodeSet) bool {
+	if !children.Has(start) {
+		roots.Set(start)
+	}
+
 	color := (*nodeColors)[start]
 	if color == Black {
 		return false
 	}
 
-	vertices, ok := al[start]
+	node, ok := sm[start]
 
 	if !ok {
 		(*nodeColors)[start] = Black
-		*visitStack = append(*visitStack, start)
-
 		return false
 	}
 
@@ -42,18 +42,18 @@ func goDeep(start VerticeName, al AdjacencyList, nodeColors *Colormap, visitStac
 		(*nodeColors)[start] = Grey
 	}
 
-	for _, node := range vertices {
+	for node, _ := range node.children {
 		color, ok := (*nodeColors)[node]
 
 		if ok {
 			if color == Black {
-				*visitStack = append(*visitStack, start)
+				(*nodeColors)[start] = Black
 			}
 
 			return color == Grey
 		}
 
-		hasCycle := goDeep(node, al, nodeColors, visitStack)
+		hasCycle := deepSearch(node, sm, nodeColors, children, roots)
 
 		if hasCycle {
 			return true
@@ -63,18 +63,37 @@ func goDeep(start VerticeName, al AdjacencyList, nodeColors *Colormap, visitStac
 	color = (*nodeColors)[start]
 	if color == Grey {
 		(*nodeColors)[start] = Black
-		*visitStack = append(*visitStack, start)
 	}
 
 	return false
 }
 
-// DFS algorithm
-func DfsSort(al AdjacencyList) (hasCycle bool, sortedNodes []VerticeName) {
-	cm := make(Colormap)
+func probeDepth(parent NodeName, sm stepMap) int {
+	node, ok := sm[parent]
+	if !ok {
+		return 1
+	}
 
-	for node := range al {
-		hasCycle = goDeep(node, al, &cm, &sortedNodes)
+	max := 1
+
+	for node, _ := range node.children {
+		val := 1 + probeDepth(node, sm)
+		if val > max {
+			max = val
+		}
+	}
+
+	return max
+}
+
+// DfsSort uses recursive deep first search algorithm to find cycles
+// and topologically sort control graph
+func dfsSort(sm stepMap, childrens nodeSet) (hasCycle bool, roots nodeSet) {
+	cm := make(colormap)
+	roots = NewNodeSet()
+
+	for node := range sm {
+		hasCycle = deepSearch(node, sm, &cm, childrens, roots)
 
 		if hasCycle {
 			return
@@ -84,24 +103,30 @@ func DfsSort(al AdjacencyList) (hasCycle bool, sortedNodes []VerticeName) {
 	return
 }
 
-func PlotAdjacencyList(sm StepMap) (AdjacencyList, []VerticeName, error) {
-	al := make(AdjacencyList, len(sm))
+// CheckGraph finds if control graph and finds deepest root
+func CheckGraph(sm stepMap) (NodeName, error) {
+	childrenList := NewNodeSet()
 
-	for k, v := range sm {
-		_, ok := al[k]
+	for _, v := range sm {
+		childrenList.AppendNodeSet(v.children)
+	}
 
-		if !ok {
-			al[k] = v.Children
-		} else {
-			al[k] = append(al[k], v.Children...)
+	hasCycles, roots := dfsSort(sm, childrenList)
+
+	if hasCycles {
+		return "",errors.New("control graph can't hold cycles")
+	}
+
+	var maxRootName NodeName
+	maxRootDepth := 1
+
+	for node, _ := range roots {
+		depth := probeDepth(node, sm)
+		if depth >= maxRootDepth {
+			maxRootDepth = depth
+			maxRootName = node
 		}
 	}
 
-	hasCycles, sortedGraph := DfsSort(al)
-
-	if hasCycles {
-		return AdjacencyList{}, []VerticeName{}, errors.New("control graph can't hold cycles")
-	}
-
-	return al, sortedGraph, nil
+	return maxRootName, nil
 }
