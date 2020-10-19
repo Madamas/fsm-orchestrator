@@ -1,15 +1,15 @@
 package fsm
 
 // key is node we step into, value is it's children and function to be executed
-type StepMap map[VerticeName]NodeMap
+type stepMap map[NodeName]nodeMap
 
-func NewStepMap() StepMap {
-	return make(StepMap)
+func NewStepMap() stepMap {
+	return make(stepMap)
 }
 
-func (sm StepMap) AddStep(node VerticeName, childrenNodes []VerticeName, nodeFunction StepFunction) {
-	sm[node] = NodeMap{
-		Children: childrenNodes,
-		Function: nodeFunction,
+func (sm stepMap) AddStep(node NodeName, childrenNodes []NodeName, nodeFunction StepFunction) {
+	sm[node] = nodeMap{
+		children: NewNodeSet(childrenNodes...),
+		function: nodeFunction,
 	}
 }
