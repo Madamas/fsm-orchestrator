@@ -32,12 +32,26 @@ type ObjectDTO struct {
 
 type KV map[string]interface{}
 
+type OperationKey string
+
+var (
+	AddOperation OperationKey = "add"
+)
+
+type OperationValue map[string]interface{}
+type OperationMap map[OperationKey][]OperationValue
+
+type CheckinObj struct {
+	Step      string    `bson:"step" json:"step"`
+	Timestamp time.Time `bson:"timestamp" json:"timestamp"`
+}
+
 // Storage provides easy to provide minimalistic approach to abstract persistent storage.
 // Update operation receives map of fields which corresponds to object's json field tags by name.
 type Storage interface {
-	Create(obj ObjectDTO) (Object, error)
-	FindById(id string) (Object, error)
-	UpdateById(id string, update KV) error
+	Create(obj ObjectDTO) (*Object, error)
+	FindById(id string) (*Object, error)
+	UpdateById(id string, update KV, operation OperationMap) error
 }
 
 // Repository provides utilitarian wrappings for internal usage
@@ -45,9 +59,22 @@ type Repository struct {
 	Storage
 }
 
-func (r *Repository) CreateJob(obj ObjectDTO) (Object, error) {
+func (r *Repository) CreateJob(obj ObjectDTO) (*Object, error) {
 	// can add validator or something like that here
 	return r.Create(obj)
+}
+
+func (r *Repository) CheckinJob(id string, step string) error {
+	operations := OperationMap{
+		AddOperation: []OperationValue{{
+			"step": CheckinObj{
+				Step:      step,
+				Timestamp: time.Now(),
+			}},
+		},
+	}
+
+	return r.UpdateById(id, nil, operations)
 }
 
 func (r *Repository) StartJob(id string) error {
@@ -55,7 +82,7 @@ func (r *Repository) StartJob(id string) error {
 		"status": Processing,
 	}
 
-	return r.UpdateById(id, data)
+	return r.UpdateById(id, data, nil)
 }
 
 func (r *Repository) FailJob(id string, err error) error {
@@ -64,7 +91,7 @@ func (r *Repository) FailJob(id string, err error) error {
 		"error":  err.Error(),
 	}
 
-	return r.UpdateById(id, data)
+	return r.UpdateById(id, data, nil)
 }
 
 func (r *Repository) CompleteJob(id string) error {
@@ -72,5 +99,5 @@ func (r *Repository) CompleteJob(id string) error {
 		"status": Completed,
 	}
 
-	return r.UpdateById(id, data)
+	return r.UpdateById(id, data, nil)
 }
