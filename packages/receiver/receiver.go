@@ -2,9 +2,9 @@ package receiver
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/Madamas/fsm-orchestrator/packages/storage"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
 )

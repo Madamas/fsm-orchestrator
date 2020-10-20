@@ -1,7 +1,7 @@
 package fsm
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 )
 
 type NodeName string

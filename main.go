@@ -6,7 +6,7 @@ import (
 	"github.com/Madamas/fsm-orchestrator/packages/fsm"
 )
 
-func blankFunc(_ fsm.ExecutionContext) (fsm.NodeName, error) { return "", nil }
+func blankFunc(_ *fsm.ExecutionContext) (fsm.NodeName, error) { return "", nil }
 
 func main() {
 	sm := fsm.NewStepMap()
