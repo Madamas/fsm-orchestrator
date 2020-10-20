@@ -54,7 +54,13 @@ type Storage interface {
 	UpdateById(id string, update KV, operation OperationMap) error
 }
 
-// Repository provides utilitarian wrappings for internal usage
+func NewRepository(storage Storage) Repository {
+	return Repository{
+		storage,
+	}
+}
+
+// Repository provides utilitarian wrappings around Storage for internal usage
 type Repository struct {
 	Storage
 }
