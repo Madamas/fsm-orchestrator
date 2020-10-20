@@ -71,7 +71,7 @@ func NewExecutor(storage storage.Repository) *Executor {
 }
 
 func (e *Executor) AddControlGraph(name string, sm stepMap) error {
-	root, err := CheckGraph(sm)
+	root, err := checkGraph(sm)
 
 	if err != nil {
 		return err

@@ -103,8 +103,8 @@ func dfsSort(sm stepMap, childrens nodeSet) (hasCycle bool, roots nodeSet) {
 	return
 }
 
-// CheckGraph finds if control graph and finds deepest root
-func CheckGraph(sm stepMap) (NodeName, error) {
+// checkGraph finds if control graph and finds deepest root
+func checkGraph(sm stepMap) (NodeName, error) {
 	childrenList := NewNodeSet()
 
 	for _, v := range sm {
@@ -114,7 +114,7 @@ func CheckGraph(sm stepMap) (NodeName, error) {
 	hasCycles, roots := dfsSort(sm, childrenList)
 
 	if hasCycles {
-		return "",errors.New("control graph can't hold cycles")
+		return "", errors.New("control graph can't hold cycles")
 	}
 
 	var maxRootName NodeName
