@@ -1,19 +1,22 @@
 package fsm
 
 import (
-	"errors"
 	"fmt"
 	"github.com/Madamas/fsm-orchestrator/packages/storage"
+	"github.com/pkg/errors"
 	"sync"
 )
 
 type ExecutionContext struct {
+	Params                map[string]interface{}
+	ExecutionDependencies sync.Map
+
 	step                  NodeName
 	prevStep              NodeName
-	ExecutionDependencies map[string]interface{}
+	jobId                 string
 }
 
-type StepFunction func(econt ExecutionContext) (NodeName, error)
+type StepFunction func(execCont *ExecutionContext) (NodeName, error)
 
 type nodeMap struct {
 	children nodeSet
@@ -46,12 +49,25 @@ func (es *executionStore) storeGraph(key string, entry storeEntry) {
 }
 
 type Executor struct {
-	executorChannel <-chan string
-	storage         storage.Repository
-
-	executionStore executionStore
-
+	ExecutorChannel   <-chan string
+	storage           storage.Repository
+	executionStore    executionStore
 	consumerSemaphore sync.WaitGroup
+}
+
+func NewExecutor(storage storage.Repository) *Executor {
+	echan := make(chan string)
+	store := make(map[string]storeEntry)
+
+	return &Executor{
+		ExecutorChannel:   echan,
+		storage:           storage,
+		consumerSemaphore: sync.WaitGroup{},
+		executionStore: executionStore{
+			store: store,
+			mux:   sync.RWMutex{},
+		},
+	}
 }
 
 func (e *Executor) AddControlGraph(name string, sm stepMap) error {
@@ -68,17 +84,45 @@ func (e *Executor) AddControlGraph(name string, sm stepMap) error {
 
 	return nil
 }
-func (e *Executor) executeGraph(root NodeName, al stepMap, params map[string]interface{}) {
 
+func (e *Executor) StartProcessing() {
+	defer e.consumerSemaphore.Wait()
+
+	for i := 0; i < 5; i++ {
+		e.consumerSemaphore.Add(1)
+		go e.stepConsumer()
+	}
 }
+
+func (e *Executor) executeGraph(node NodeName, al stepMap, execCont *ExecutionContext) error {
+	// inability to checkin shouldn't cripple graph execution
+	_ = e.storage.CheckinJob(execCont.jobId, string(node))
+	executor, ok := al[node]
+
+	if !ok {
+		return nil
+	}
+
+	nextNode, err := executor.function(execCont)
+
+	if err != nil {
+		return err
+	}
+
+	execCont.prevStep = node
+	execCont.step = nextNode
+
+	return e.executeGraph(nextNode, al, execCont)
+}
+
 func (e *Executor) stepConsumer() {
 	defer e.consumerSemaphore.Done()
 
-	for event := range e.executorChannel {
+	for event := range e.ExecutorChannel {
 		job, err := e.storage.FindById(event)
 
-		if err != nil {
-			fmt.Println("Couldn't find job", err.Error())
+		if err != nil || job == nil {
+			fmt.Println("Couldn't find job", err)
 		}
 
 		graph, ok := e.executionStore.loadGraph(job.CommandGraph)
@@ -90,13 +134,17 @@ func (e *Executor) stepConsumer() {
 			}
 		}
 
-		e.executeGraph(graph.root, graph.stepMap, job.Params)
-	}
-}
-func (e *Executor) StartProcessing() {
-	defer e.consumerSemaphore.Wait()
+		eCont := ExecutionContext{
+			Params:   job.Params,
+			step:     graph.root,
+			prevStep: graph.root,
+			jobId:    job.ID,
+		}
 
-	for i := 0; i < 5; i++ {
-		e.consumerSemaphore.Add(1)
+		err = e.executeGraph(graph.root, graph.stepMap, &eCont)
+
+		if err != nil {
+			_ = e.storage.FailJob(job.ID, err)
+		}
 	}
 }
