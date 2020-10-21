@@ -15,16 +15,18 @@ var (
 
 // Update operations must reference this fields by their json tag
 type Object struct {
-	ID          string    `bson:"_id" json:"id"`
-	CreatedAt   time.Time `bson:"createdAt" json:"createdAt"`
-	UpdatedAt   time.Time `bson:"updatedAt" json:"updatedAt"`
-	CompletedAt time.Time `bson:"completedAt" json:"completedAt"`
-	Error       string    `bson:"error" json:"error"`
-	ObjectDTO
+	ID           string                 `bson:"_id" json:"id"`
+	CreatedAt    time.Time              `bson:"createdAt" json:"createdAt"`
+	UpdatedAt    time.Time              `bson:"updatedAt" json:"updatedAt"`
+	CompletedAt  time.Time              `bson:"completedAt" json:"completedAt"`
+	Error        string                 `bson:"error" json:"error"`
+	CurrentStep  string                 `bson:"currentStep" json:"currentStep"`
+	CommandGraph string                 `bson:"commandGraph" json:"commandGraph"`
+	Status       Status                 `bson:"status" json:"status"`
+	Params       map[string]interface{} `bson:"params" json:"params"`
 }
 
 type ObjectDTO struct {
-	CurrentStep  string                 `bson:"currentStep" json:"currentStep"`
 	CommandGraph string                 `bson:"commandGraph" json:"commandGraph"`
 	Status       Status                 `bson:"status" json:"status"`
 	Params       map[string]interface{} `bson:"params" json:"params"`
