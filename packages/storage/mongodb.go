@@ -137,17 +137,17 @@ func Connect(url, db string) (*connection, error) {
 	}, nil
 }
 
-func NewMongoStorage(url, db string) (Storage, error) {
+func NewMongoStorage(url, db, table string) (*Repository, error) {
 	conn, err := Connect(url, db)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &MongoStorage{
+	return NewRepository(&MongoStorage{
 		conn: conn,
-		name: "somename",
-	}, nil
+		name: table,
+	}), nil
 }
 
 type MongoStorage struct {

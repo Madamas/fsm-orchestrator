@@ -9,11 +9,11 @@ import (
 
 type ExecutionContext struct {
 	Params                map[string]interface{}
-	ExecutionDependencies sync.Map
+	ExecutionDependencies *sync.Map
 
-	step                  NodeName
-	prevStep              NodeName
-	jobId                 string
+	step     NodeName
+	prevStep NodeName
+	jobId    string
 }
 
 type StepFunction func(execCont *ExecutionContext) (NodeName, error)
@@ -49,20 +49,22 @@ func (es *executionStore) storeGraph(key string, entry storeEntry) {
 }
 
 type Executor struct {
-	ExecutorChannel   <-chan string
-	storage           storage.Repository
-	executionStore    executionStore
-	consumerSemaphore sync.WaitGroup
+	ExecutorChannel       <-chan string
+	executionDependencies *sync.Map
+	storage               storage.Repository
+	executionStore        executionStore
+	consumerSemaphore     sync.WaitGroup
 }
 
-func NewExecutor(storage storage.Repository) *Executor {
+func NewExecutor(storage storage.Repository, dependencies *sync.Map) *Executor {
 	echan := make(chan string)
 	store := make(map[string]storeEntry)
 
 	return &Executor{
-		ExecutorChannel:   echan,
-		storage:           storage,
-		consumerSemaphore: sync.WaitGroup{},
+		ExecutorChannel:       echan,
+		executionDependencies: dependencies,
+		storage:               storage,
+		consumerSemaphore:     sync.WaitGroup{},
 		executionStore: executionStore{
 			store: store,
 			mux:   sync.RWMutex{},

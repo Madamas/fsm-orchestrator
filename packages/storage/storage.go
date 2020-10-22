@@ -56,8 +56,8 @@ type Storage interface {
 	UpdateById(id string, update KV, operation OperationMap) error
 }
 
-func NewRepository(storage Storage) Repository {
-	return Repository{
+func NewRepository(storage Storage) *Repository {
+	return &Repository{
 		storage,
 	}
 }
