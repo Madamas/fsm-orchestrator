@@ -4,7 +4,7 @@ Main conception is to create easy to use and deploy solution that aims to provid
 This repository provides abstract api that implements execution graph storage and invocation via http and basic storage interface.
 
 ## Workflow
-The main concept is providing your execution directional acyclic graph with transient functions. 
+The main step is to provide your execution directional acyclic graph with transient functions. 
 Before storing, each graph will be topographically sorted, checked for cycles and all roots will be found (if applicable).
 **If your graph will contain more than one root then deepest will be selected.**  
 
