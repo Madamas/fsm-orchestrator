@@ -50,6 +50,7 @@ func (es *executionStore) storeGraph(key string, entry storeEntry) {
 
 type Executor struct {
 	ExecutorChannel       <-chan string
+	JobStack              JobStack
 	executionDependencies *sync.Map
 	storage               storage.Repository
 	executionStore        executionStore
@@ -59,9 +60,11 @@ type Executor struct {
 func NewExecutor(storage storage.Repository, dependencies *sync.Map) *Executor {
 	echan := make(chan string)
 	store := make(map[string]storeEntry)
+	jobStack := NewJobStack(5)
 
 	return &Executor{
 		ExecutorChannel:       echan,
+		JobStack:              jobStack,
 		executionDependencies: dependencies,
 		storage:               storage,
 		consumerSemaphore:     sync.WaitGroup{},
@@ -70,6 +73,10 @@ func NewExecutor(storage storage.Repository, dependencies *sync.Map) *Executor {
 			mux:   sync.RWMutex{},
 		},
 	}
+}
+
+func (e *Executor) GetJobStack() JobStackLister {
+	return e.JobStack
 }
 
 func (e *Executor) AddControlGraph(name string, sm stepMap) error {
@@ -126,6 +133,7 @@ func (e *Executor) stepConsumer() {
 		if err != nil || job == nil {
 			fmt.Println("Couldn't find job", err)
 		}
+		e.JobStack.StartJob(job.ID)
 
 		graph, ok := e.executionStore.loadGraph(job.CommandGraph)
 
@@ -148,5 +156,7 @@ func (e *Executor) stepConsumer() {
 		if err != nil {
 			_ = e.storage.FailJob(job.ID, err)
 		}
+
+		e.JobStack.FinishJob(job.ID)
 	}
 }

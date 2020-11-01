@@ -66,7 +66,7 @@ sm := make(sync.Map)
 executor := fsm.NewExecutor(mongoStorage, sm)
 executor.AddControlGraph("SuperControlGraph", stepMap)
 
-rec := receiver.CreateHttpListener(executor.ExecutorChannel, mongo)
+rec := receiver.CreateHttpListener(executor.ExecutorChannel, mongo, executor.GetJobStack())
 
 go func() {
     err := rec.ListenAndServe()
