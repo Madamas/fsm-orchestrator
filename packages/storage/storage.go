@@ -15,7 +15,7 @@ var (
 
 // Update operations must reference this fields by their json tag
 type Object struct {
-	ID           string                 `bson:"_id" json:"id"`
+	ID           interface{}            `bson:"_id" json:"id"`
 	CreatedAt    time.Time              `bson:"createdAt" json:"createdAt"`
 	UpdatedAt    time.Time              `bson:"updatedAt" json:"updatedAt"`
 	CompletedAt  time.Time              `bson:"completedAt" json:"completedAt"`
@@ -41,7 +41,7 @@ var (
 )
 
 type OperationValue map[string]interface{}
-type OperationMap map[OperationKey][]OperationValue
+type OperationMap map[OperationKey]OperationValue
 
 type CheckinObj struct {
 	Step      string    `bson:"step" json:"step"`
@@ -73,21 +73,26 @@ func (r *Repository) CreateJob(obj ObjectDTO) (*Object, error) {
 }
 
 func (r *Repository) CheckinJob(id string, step string) error {
+	update := KV{
+		"currentStep": step,
+	}
+
 	operations := OperationMap{
-		AddOperation: []OperationValue{{
+		AddOperation: OperationValue{
 			"step": CheckinObj{
 				Step:      step,
 				Timestamp: time.Now(),
-			}},
+			},
 		},
 	}
 
-	return r.UpdateById(id, nil, operations)
+	return r.UpdateById(id, update, operations)
 }
 
-func (r *Repository) StartJob(id string) error {
+func (r *Repository) StartJob(id string, step string) error {
 	data := KV{
-		"status": Processing,
+		"status":      Processing,
+		"currentStep": step,
 	}
 
 	return r.UpdateById(id, data, nil)
@@ -104,7 +109,8 @@ func (r *Repository) FailJob(id string, err error) error {
 
 func (r *Repository) CompleteJob(id string) error {
 	data := KV{
-		"status": Completed,
+		"status":      Completed,
+		"completedAt": time.Now(),
 	}
 
 	return r.UpdateById(id, data, nil)

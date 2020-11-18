@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Madamas/fsm-orchestrator/packages/fsm"
+	"github.com/Madamas/fsm-orchestrator/packages/queue"
 	"github.com/Madamas/fsm-orchestrator/packages/storage"
+	"github.com/gocraft/work"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"io/ioutil"
@@ -17,9 +19,9 @@ type payload struct {
 }
 
 type HandleContext struct {
-	jobStack        fsm.JobStackLister
-	executorChannel chan<- string
-	repository      storage.Repository
+	jobStack   fsm.JobStackLister
+	enqueuer   *work.Enqueuer
+	repository *storage.Repository
 }
 
 func mapObjectDto(payload payload) storage.ObjectDTO {
@@ -36,46 +38,47 @@ func (hc *HandleContext) createJob(r http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 
 	if err != nil {
-		r.WriteHeader(500)
+		r.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	err = json.Unmarshal(body, &payload)
 
 	if err != nil {
+		r.WriteHeader(http.StatusBadRequest)
 		r.Write([]byte(err.Error()))
-		r.WriteHeader(400)
 		return
 	}
 
 	obj, err := hc.repository.CreateJob(mapObjectDto(payload))
 
 	if err != nil {
+		r.WriteHeader(http.StatusInternalServerError)
 		r.Write([]byte(err.Error()))
-		r.WriteHeader(500)
 		return
 	}
 
-	err = hc.NotifyContext(obj.ID)
+	err = hc.NotifyContext(obj.ID.(string))
 
 	if err != nil {
+		r.WriteHeader(http.StatusInternalServerError)
 		r.Write([]byte(err.Error()))
-		r.WriteHeader(500)
-		hc.repository.FailJob(obj.ID, err)
+		hc.repository.FailJob(obj.ID.(string), err)
 		return
 	}
 
 	resp, err := json.Marshal(obj)
 
 	if err != nil {
+		r.WriteHeader(http.StatusInternalServerError)
 		r.Write([]byte(err.Error()))
-		r.WriteHeader(500)
-		hc.repository.FailJob(obj.ID, err)
+		hc.repository.FailJob(obj.ID.(string), err)
 		return
 	}
 
+	r.Header().Set("Content-Type", "application/json")
+	r.WriteHeader(http.StatusOK)
 	r.Write(resp)
-	r.WriteHeader(200)
 
 	return
 }
@@ -87,6 +90,7 @@ func (hc *HandleContext) getJob(r http.ResponseWriter, req *http.Request) {
 	job, err := hc.repository.FindById(jobId)
 
 	if err != nil {
+		fmt.Println("govno")
 		r.WriteHeader(http.StatusInternalServerError)
 		r.Write([]byte(err.Error()))
 		return
@@ -123,21 +127,23 @@ func (hc *HandleContext) NotifyContext(id string) (err error) {
 		}
 	}()
 
-	hc.executorChannel <- id
+	_, err = hc.enqueuer.Enqueue(queue.QueueJobName, work.Q{
+		"jobId": id,
+	})
 
 	return
 }
 
-func CreateHttpListener(executorChannel chan<- string, repository storage.Repository, jobStack fsm.JobStackLister) http.Server {
+func CreateHttpListener(enqueuer *work.Enqueuer, repository *storage.Repository, jobStack fsm.JobStackLister) http.Server {
 	hc := HandleContext{
-		jobStack:        jobStack,
-		executorChannel: executorChannel,
-		repository:      repository,
+		jobStack:   jobStack,
+		enqueuer:   enqueuer,
+		repository: repository,
 	}
 
 	router := mux.NewRouter()
 	router.HandleFunc("/jobs", hc.createJob).Methods("POST")
-	router.HandleFunc("/jobs/list", hc.getJob).Methods("GET")
+	router.HandleFunc("/jobs/list", hc.listJobs).Methods("GET")
 	router.HandleFunc("/jobs/{id}", hc.getJob).Methods("GET")
 
 	return http.Server{

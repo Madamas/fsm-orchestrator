@@ -170,16 +170,18 @@ func (ms *MongoStorage) Create(obj ObjectDTO) (*Object, error) {
 	}
 
 	job := &Object{
-		ID:           bson.NewObjectId().String(),
-		CreatedAt:    time.Time{},
+		ID:           bson.NewObjectId(),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 		Status:       obj.Status,
 		CommandGraph: obj.CommandGraph,
 		Params:       obj.Params,
 	}
-
 	if err = collection.Insert(job); err != nil {
 		return nil, err
 	}
+
+	job.ID = job.ID.(bson.ObjectId).Hex()
 
 	return job, nil
 }
@@ -203,7 +205,18 @@ func (ms *MongoStorage) FindById(id string) (*Object, error) {
 		return nil, err
 	}
 
+	obj.ID = obj.ID.(bson.ObjectId).Hex()
+
 	return obj, nil
+}
+
+func operationMapper(operation OperationKey) string {
+	switch operation {
+	case AddOperation:
+		return "$push"
+	default:
+		return ""
+	}
 }
 
 func (ms *MongoStorage) UpdateById(id string, update KV, operation OperationMap) error {
@@ -230,7 +243,7 @@ func (ms *MongoStorage) UpdateById(id string, update KV, operation OperationMap)
 
 	if operation != nil {
 		for key, val := range operation {
-			change[string(key)] = val
+			change[operationMapper(key)] = val
 		}
 	}
 
