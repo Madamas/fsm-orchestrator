@@ -36,17 +36,12 @@ type KV map[string]interface{}
 
 type OperationKey string
 
-var (
+const (
 	AddOperation OperationKey = "add"
 )
 
 type OperationValue map[string]interface{}
 type OperationMap map[OperationKey]OperationValue
-
-type CheckinObj struct {
-	Step      string    `bson:"step" json:"step"`
-	Timestamp time.Time `bson:"timestamp" json:"timestamp"`
-}
 
 // Storage provides easy to provide minimalistic approach to abstract persistent storage.
 // Update operation receives map of fields which corresponds to object's json field tags by name.
@@ -54,6 +49,11 @@ type Storage interface {
 	Create(obj ObjectDTO) (*Object, error)
 	FindById(id string) (*Object, error)
 	UpdateById(id string, update KV, operation OperationMap) error
+}
+
+type CheckinObj struct {
+	Step      string    `bson:"step" json:"step"`
+	Timestamp time.Time `bson:"timestamp" json:"timestamp"`
 }
 
 func NewRepository(storage Storage) *Repository {

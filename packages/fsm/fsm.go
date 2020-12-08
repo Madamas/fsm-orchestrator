@@ -8,15 +8,13 @@ import (
 	"sync"
 )
 
-const FSM_CONCURRENCY = 5
-
 type ExecutionContext struct {
 	Params                map[string]interface{}
 	ExecutionDependencies *sync.Map
 
 	step     NodeName
 	prevStep NodeName
-	jobId    string
+	JobId    string
 }
 
 type StepFunction func(execCont *ExecutionContext) (NodeName, error)
@@ -58,9 +56,10 @@ type Executor struct {
 	storage               *storage.Repository
 	executionStore        executionStore
 	consumerSemaphore     sync.WaitGroup
+	concurrency           int
 }
 
-func NewExecutor(storage *storage.Repository, dependencies *sync.Map) *Executor {
+func NewExecutor(storage *storage.Repository, dependencies *sync.Map, concurrency int) *Executor {
 	echan := make(chan string)
 	store := make(map[string]storeEntry)
 	jobStack := NewJobStack(5)
@@ -71,6 +70,7 @@ func NewExecutor(storage *storage.Repository, dependencies *sync.Map) *Executor 
 		executionDependencies: dependencies,
 		storage:               storage,
 		consumerSemaphore:     sync.WaitGroup{},
+		concurrency:           concurrency,
 		executionStore: executionStore{
 			store: store,
 			mux:   sync.RWMutex{},
@@ -100,7 +100,7 @@ func (e *Executor) AddControlGraph(name string, sm stepMap) error {
 func (e *Executor) StartProcessing() {
 	defer e.consumerSemaphore.Wait()
 
-	for i := 0; i < FSM_CONCURRENCY; i++ {
+	for i := 0; i < e.concurrency; i++ {
 		e.consumerSemaphore.Add(1)
 		go e.stepConsumer()
 	}
@@ -108,7 +108,7 @@ func (e *Executor) StartProcessing() {
 
 func (e *Executor) executeGraph(node NodeName, al stepMap, execCont *ExecutionContext) error {
 	// inability to checkin shouldn't cripple graph execution
-	err := e.storage.CheckinJob(execCont.jobId, string(node))
+	err := e.storage.CheckinJob(execCont.JobId, string(node))
 	executor, ok := al[node]
 
 	if !ok {
@@ -166,10 +166,11 @@ func (e *Executor) stepConsumer() {
 		}
 
 		eCont := ExecutionContext{
-			Params:   job.Params,
-			step:     graph.root,
-			prevStep: graph.root,
-			jobId:    job.ID.(string),
+			Params:                job.Params,
+			ExecutionDependencies: e.executionDependencies,
+			step:                  graph.root,
+			prevStep:              graph.root,
+			JobId:                 job.ID.(string),
 		}
 
 		err = e.executeGraph(graph.root, graph.stepMap, &eCont)

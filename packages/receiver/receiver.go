@@ -3,8 +3,8 @@ package receiver
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Madamas/fsm-orchestrator/packages/config"
 	"github.com/Madamas/fsm-orchestrator/packages/fsm"
-	"github.com/Madamas/fsm-orchestrator/packages/queue"
 	"github.com/Madamas/fsm-orchestrator/packages/storage"
 	"github.com/gocraft/work"
 	"github.com/gorilla/mux"
@@ -19,9 +19,10 @@ type payload struct {
 }
 
 type HandleContext struct {
-	jobStack   fsm.JobStackLister
-	enqueuer   *work.Enqueuer
-	repository *storage.Repository
+	jobStack     fsm.JobStackLister
+	enqueuer     *work.Enqueuer
+	repository   *storage.Repository
+	queueJobName string
 }
 
 func mapObjectDto(payload payload) storage.ObjectDTO {
@@ -127,18 +128,20 @@ func (hc *HandleContext) NotifyContext(id string) (err error) {
 		}
 	}()
 
-	_, err = hc.enqueuer.Enqueue(queue.QueueJobName, work.Q{
+	_, err = hc.enqueuer.Enqueue(hc.queueJobName, work.Q{
 		"jobId": id,
 	})
 
 	return
 }
 
-func CreateHttpListener(enqueuer *work.Enqueuer, repository *storage.Repository, jobStack fsm.JobStackLister) http.Server {
+func CreateHttpListener(config config.HttpListener) http.Server {
+	// TODO: add config validation
 	hc := HandleContext{
-		jobStack:   jobStack,
-		enqueuer:   enqueuer,
-		repository: repository,
+		jobStack:     config.JobStack,
+		enqueuer:     config.Enqueuer,
+		repository:   config.Repository,
+		queueJobName: config.QueueJobName,
 	}
 
 	router := mux.NewRouter()

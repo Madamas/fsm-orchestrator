@@ -2,16 +2,10 @@ package queue
 
 import (
 	"fmt"
+	"github.com/Madamas/fsm-orchestrator/packages/config"
 	"github.com/gocraft/work"
-	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
 	"log"
-)
-
-const (
-	queueNamespace     = "fsm-executor"
-	QueueJobName       = "execute-function"
-	HandlerConcurrency = 5
 )
 
 type Context struct {
@@ -61,17 +55,19 @@ func (c *Context) Handle(job *work.Job) error {
 	return globalErr
 }
 
-func NewEnqueuer(pool *redis.Pool) *work.Enqueuer {
-	return work.NewEnqueuer(queueNamespace, pool)
+func NewEnqueuer(config config.Enqueuer) *work.Enqueuer {
+	// TODO: add config validation
+	return work.NewEnqueuer(config.QueueNamespace, config.RedisPool)
 }
 
-func NewHandler(executorChannel chan<- string, pool *redis.Pool) *work.WorkerPool {
+func NewHandler(config config.Handler) *work.WorkerPool {
+	// TODO: add config validation
 	ctx := &Context{
-		executorChannel: executorChannel,
+		executorChannel: config.ExecutorChannel,
 	}
 
-	wp := work.NewWorkerPool(*ctx, HandlerConcurrency, queueNamespace, pool)
-	wp.JobWithOptions(QueueJobName, work.JobOptions{
+	wp := work.NewWorkerPool(*ctx, config.Concurrency, config.QueueNamespace, config.RedisPool)
+	wp.JobWithOptions(config.QueueJobName, work.JobOptions{
 		MaxFails: 1,
 		SkipDead: true,
 	}, ctx.Handle)

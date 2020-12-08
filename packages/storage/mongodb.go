@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/Madamas/fsm-orchestrator/packages/config"
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
 	"github.com/pkg/errors"
@@ -8,16 +9,10 @@ import (
 	"time"
 )
 
-type ConnCfg struct {
-	Url              string
-	Db               string
-	ReconnectTimeout time.Duration
-}
-
 // connection struct is barebone implementation that contains all that you need
 // for simple work with mongodb
 type connection struct {
-	Cfg            ConnCfg
+	Config         config.MongodbConfig
 	db             *mgo.Database
 	session        *mgo.Session
 	isConnected    bool
@@ -65,7 +60,7 @@ func (c *connection) reconnect() error {
 	c.isConnected = false
 	c.isReconnecting = true
 
-	session, err := reconnect(c.Cfg)
+	session, err := reconnect(c.Config)
 
 	if err != nil {
 		c.err = err
@@ -75,7 +70,7 @@ func (c *connection) reconnect() error {
 	}
 
 	c.session = session
-	c.db = session.DB(c.Cfg.Db)
+	c.db = session.DB(c.Config.Database)
 	c.err = nil
 	c.isConnected = true
 	c.isReconnecting = false
@@ -95,7 +90,7 @@ func closeSession(session *mgo.Session) {
 	session.Close()
 }
 
-func connect(cfg ConnCfg) (*mgo.Session, error) {
+func connect(cfg config.MongodbConfig) (*mgo.Session, error) {
 	info, err := mgo.ParseURL(cfg.Url)
 	if err != nil {
 		return nil, err
@@ -107,7 +102,7 @@ func connect(cfg ConnCfg) (*mgo.Session, error) {
 	return mgo.DialWithInfo(info)
 }
 
-func reconnect(cfg ConnCfg) (*mgo.Session, error) {
+func reconnect(cfg config.MongodbConfig) (*mgo.Session, error) {
 	for i := 0; ; i++ {
 		session, err := connect(cfg)
 
@@ -119,26 +114,22 @@ func reconnect(cfg ConnCfg) (*mgo.Session, error) {
 	}
 }
 
-func Connect(url, db string) (*connection, error) {
-	cfg := ConnCfg{
-		Url: url,
-		Db:  db,
-	}
-	session, err := connect(cfg)
+func Connect(config config.MongodbConfig) (*connection, error) {
+	session, err := connect(config)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return &connection{
-		Cfg:     cfg,
+		Config:  config,
 		session: session,
-		db:      session.DB(cfg.Db),
+		db:      session.DB(config.Database),
 	}, nil
 }
 
-func NewMongoStorage(url, db, table string) (*Repository, error) {
-	conn, err := Connect(url, db)
+func NewMongoStorage(config config.MongodbConfig) (*Repository, error) {
+	conn, err := Connect(config)
 
 	if err != nil {
 		return nil, err
@@ -146,7 +137,7 @@ func NewMongoStorage(url, db, table string) (*Repository, error) {
 
 	return NewRepository(&MongoStorage{
 		conn: conn,
-		name: table,
+		name: config.Table,
 	}), nil
 }
 
@@ -215,7 +206,7 @@ func operationMapper(operation OperationKey) string {
 	case AddOperation:
 		return "$push"
 	default:
-		return ""
+		return string(operation)
 	}
 }
 
