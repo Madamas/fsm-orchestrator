@@ -2,16 +2,18 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/Madamas/fsm-orchestrator/packages/config"
 	"github.com/Madamas/fsm-orchestrator/packages/fsm"
 	"github.com/Madamas/fsm-orchestrator/packages/queue"
 	"github.com/Madamas/fsm-orchestrator/packages/receiver"
 	"github.com/Madamas/fsm-orchestrator/packages/storage"
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
-	"log"
-	"os"
-	"sync"
-	"time"
 )
 
 func blankFunc(_ *fsm.ExecutionContext) (fsm.NodeName, error) {
@@ -63,7 +65,11 @@ func main() {
 	stepMap.AddStep("Second", []fsm.NodeName{"Fourth", "Fifth"}, fourth)
 	stepMap.AddStep("Third", []fsm.NodeName{"Sixth", "Seventh"}, blankFunc)
 
-	mongo, err := storage.NewMongoStorage("localhost", "fsm", "sample_executor")
+	mongo, err := storage.NewMongoStorage(config.MongodbConfig{
+		Url: "localhost",
+		Database: "fsm",
+		Table: "sample_executor",
+	})
 
 	if err != nil {
 		fmt.Println(err)
@@ -72,7 +78,7 @@ func main() {
 
 	sm := sync.Map{}
 
-	executor := fsm.NewExecutor(mongo, &sm)
+	executor := fsm.NewExecutor(mongo, &sm, 10)
 	err = executor.AddControlGraph("SuperControlGraph", stepMap)
 
 	if err != nil {
@@ -81,15 +87,26 @@ func main() {
 	}
 
 	rp, err := NewRedisPool()
-	eq := queue.NewEnqueuer(rp)
-	handler := queue.NewHandler(executor.ExecutorChannel, rp)
+	eq := queue.NewEnqueuer(config.Enqueuer{
+		QueueNamespace: "test",
+		RedisPool: rp,
+	})
+	handler := queue.NewHandler(config.Handler{
+		QueueNamespace: "test",
+		QueueJobName: "super_job",
+	})
 	handler.Start()
 	defer func() {
 		handler.Drain()
 		handler.Stop()
 	}()
 
-	rec := receiver.CreateHttpListener(eq, mongo, executor.GetJobStack())
+	rec := receiver.CreateHttpListener(config.HttpListener{
+		Enqueuer: eq,
+		Repository: mongo,
+		JobStack: executor.GetJobStack(),
+		QueueJobName: "super_job",
+	})
 	go executor.StartProcessing()
 
 	log.Println("Listening on 0.0.0.0:8086")
