@@ -2,10 +2,11 @@ package fsm
 
 import (
 	"fmt"
-	"github.com/Madamas/fsm-orchestrator/packages/storage"
-	"github.com/pkg/errors"
 	"log"
 	"sync"
+
+	"github.com/Madamas/fsm-orchestrator/packages/storage"
+	"github.com/pkg/errors"
 )
 
 type ExecutionContext struct {

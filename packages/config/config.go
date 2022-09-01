@@ -1,11 +1,13 @@
 package config
 
 import (
+	"time"
+
 	"github.com/Madamas/fsm-orchestrator/packages/fsm"
 	"github.com/Madamas/fsm-orchestrator/packages/storage"
+
 	"github.com/gocraft/work"
 	"github.com/gomodule/redigo/redis"
-	"time"
 )
 
 type MongodbConfig struct {
